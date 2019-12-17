@@ -1,3 +1,3 @@
 # hello-world
-Oi
+Oi :)   
 O github mandou eu escrever aqui
