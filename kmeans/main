@@ -3,6 +3,9 @@ import matplotlib.pyplot as plt
 import pickle
 import time
 
+#vetor pequeno para testes
+oi=[[1,1],[1,2],[2,1],[2,2],[8,9],[8,8],[9,8],[9,9]]
+
 
 
 def main():
@@ -27,6 +30,7 @@ def main():
    metrica_por_k=[]
    for i in range(len(resul_k)):
        metrica_por_k.append(resul_k[i][2])
+   print("Metrica por k: {}".format(metrica_por_k))
    print("t total = ",ttot)
    plt.plot(xb,metrica_por_k)
    
@@ -79,23 +83,22 @@ def kloop(pontos,k,interacoes,metodo):
         best_sum_var=total_var(pontos,best_clusters,best_relacao)
     else:
         best_silhu=silhueta_media(pontos,best_clusters,best_relacao)
-    for i in range(1,interacoes):
-        clusters=get_clusters(k, pontos)
-        clusters, relacao = kmeans(pontos,clusters)
-        if metodo=="elbow":
-            sum_var_atual=total_var(pontos,clusters,relacao)
-            if sum_var_atual<best_sum_var:
-                best_clusters=clusters
-                best_relacao=relacao
-                best_sum_var=sum_var_atual
-            return [best_clusters, best_relacao, best_sum_var]
-        else:
-            silhu_atual=silhueta_media(pontos,clusters,relacao)
-            if silhu_atual<best_silhu:
-                best_clusters=clusters
-                best_relacao=relacao
-                best_silhu=silhu_atual
-            return [best_clusters, best_relacao, best_silhu]
+    if interacoes>1:
+        for i in range(1,interacoes):
+            clusters=get_clusters(k, pontos)
+            clusters, relacao = kmeans(pontos,clusters)
+            if metodo=="elbow":
+                sum_var_atual=total_var(pontos,clusters,relacao)
+                if sum_var_atual<best_sum_var:
+                    best_clusters=clusters
+                    best_relacao=relacao
+                    best_sum_var=sum_var_atual
+            else:
+                silhu_atual=silhueta_media(pontos,clusters,relacao)
+                if silhu_atual>best_silhu:
+                    best_clusters=clusters
+                    best_relacao=relacao
+                    best_silhu=silhu_atual
     if metodo=='elbow':
         return [best_clusters, best_relacao, best_sum_var]
     return [best_clusters, best_relacao, best_silhu]
@@ -166,30 +169,41 @@ def total_var(pontos,clusters,relacao):
 def silhueta_media(pontos,clusters,relacao):
     s=0
     for i in range(len(pontos)):
-        s+=silhueta_pt(i,pontos,clusters,relacao)
+        s+=silhueta_pt(i,pontos,clusters,relacao)   
     return s/len(pontos)
         
 
 def silhueta_pt(ind_pt,pontos,clusters,relacao):
+    if len(clusters)==1:
+        return 0
     pt=pontos[ind_pt]
     clus_certo=relacao[ind_pt]
-    parciais=[[0,0]]*len(clusters)
+    parciais=[0]*len(clusters)
+    for i in range(len(clusters)):
+        parciais[i]=[0,0]
     for i in range(len(pontos)):
         t=relacao[i]
-        parciais[t][0]+=dist_sqd(pt,pontos[i])
+        parciais[t][0]+=dist_sqd(pt,pontos[i])**0.5
         parciais[t][1]+=1
     if parciais[clus_certo][1]==1:
         return 0
     a=parciais[clus_certo][0]/(parciais[clus_certo][1]-1)
-    if clus_certo==0 and len(clusters)>1:
-        b=parciais[1][0]/(parciais[1][1])
-    else:
-        b=parciais[0][0]/(parciais[0][1])
-    for j in range(1,len(clusters)):
-        if j!=clus_certo and len(clusters)>1:
+    bol=True
+    n=0
+    while bol and n<len(clusters):
+        if parciais[n][1]!=0 and n!=clus_certo:
+            b=parciais[n][0]/(parciais[n][1])
+            bol=False
+        else:
+            n+=1
+        
+    for j in range(n+1,len(clusters)):
+        if j!=clus_certo and parciais[j][1]!=0:
             c=parciais[j][0]/(parciais[j][1])
             if c<b:
                 b=c
+    if n==len(clusters):
+        return 0
     s=(b-a)/max(a,b)
     return s
     
