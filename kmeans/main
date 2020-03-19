@@ -1,0 +1,197 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import pickle
+import time
+
+
+
+def main():
+#objetos: pontos, clusters, correlação ponto-cluster
+#fazer: get_pontos
+
+   t0=time.time()
+   pontos=iris_data()
+   iteracoes=int(input('Digite quantas iterações por k: '))
+   metodo=input('Digite elbow ou silhueta: ')
+   print(metodo)
+   #resul_k recebe, para cada k: os clusters, a relacao ponto-cluster e os valores da metrica escolhida
+   resul_k=[]
+   xb=np.arange(1,12)
+   ttot=0
+   for k in range(1,12):
+       resul_k.append(kloop(pontos,k,iteracoes,metodo))
+       tt=time.time()-t0
+       ttot+=tt
+       t0=time.time()
+       print('Foi k={0}, t={1}'.format(k,tt))
+   metrica_por_k=[]
+   for i in range(len(resul_k)):
+       metrica_por_k.append(resul_k[i][2])
+   print("t total = ",ttot)
+   plt.plot(xb,metrica_por_k)
+   
+   #bloco para plotar os dados depois de escolher o k (provavelmente devia ser uma funcao)
+   '''for i in range(len(pontos)):
+       if resul_k[2][1][i]==0:
+           plt.plot(pontos[i][0],pontos[i][1],'og')
+       elif resul_k[2][1][i]==1:
+           plt.plot(pontos[i][0],pontos[i][1],'or')
+       else:
+           plt.plot(pontos[i][0],pontos[i][1],'ob')
+   #print(resul_k[2][0])
+   for i in range(len(resul_k[2][0])):
+       plt.plot(resul_k[2][0][i][0],resul_k[2][0][i][1],'oy')
+   '''
+   
+    
+    
+def vgc18_data():
+    file=open('times_vgc18_vetores.txt','rb')
+    pontos=pickle.load(file)
+    file.close()
+    return pontos
+
+def vgc18_viaveis_data():
+    file=open('times_viaveis_vgc18_vetores.txt','rb')
+    pontos=pickle.load(file)
+    file.close()
+    return pontos
+
+def iris_data():
+   file=open("iris.data","r")
+   texto=file.read()
+   file.close()
+   pontos=texto.split('\n')
+   pontos.pop()
+   pontos.pop()
+   for i in range(len(pontos)):
+       pontos[i]=pontos[i].split(',')
+       pontos[i].pop()
+       for j in range(len(pontos[i])):
+           pontos[i][j]=float(pontos[i][j])
+   return pontos
+
+def kloop(pontos,k,interacoes,metodo):
+    #pega o melhor resultado entre n interacoes usando k clusters
+    best_clusters=get_clusters(k, pontos)
+    best_clusters, best_relacao = kmeans(pontos,best_clusters)
+    if metodo=="elbow":
+        best_sum_var=total_var(pontos,best_clusters,best_relacao)
+    else:
+        best_silhu=silhueta_media(pontos,best_clusters,best_relacao)
+    for i in range(1,interacoes):
+        clusters=get_clusters(k, pontos)
+        clusters, relacao = kmeans(pontos,clusters)
+        if metodo=="elbow":
+            sum_var_atual=total_var(pontos,clusters,relacao)
+            if sum_var_atual<best_sum_var:
+                best_clusters=clusters
+                best_relacao=relacao
+                best_sum_var=sum_var_atual
+            return [best_clusters, best_relacao, best_sum_var]
+        else:
+            silhu_atual=silhueta_media(pontos,clusters,relacao)
+            if silhu_atual<best_silhu:
+                best_clusters=clusters
+                best_relacao=relacao
+                best_silhu=silhu_atual
+            return [best_clusters, best_relacao, best_silhu]
+    if metodo=='elbow':
+        return [best_clusters, best_relacao, best_sum_var]
+    return [best_clusters, best_relacao, best_silhu]
+            
+            
+def kmeans(pontos,clusters):
+    #retorna os clusters e um vetor com o indice do cluster de cada ponto
+    relacao=[]
+    for i in range(len(pontos)):
+        relacao.append(near_cluster(pontos[i],clusters))
+    rel_velha=relacao[:]
+    parada=False
+    i=0
+    while not parada and i<300:
+        for i in range(len(clusters)):
+            clusters[i]=atualiza_cluster(pontos,i,relacao)
+        for j in range(len(relacao)):
+            relacao[j]=near_cluster(pontos[j],clusters)
+        if relacao==rel_velha:
+            parada=True
+        else:
+            rel_velha=relacao[:]
+        i+=1
+    return clusters, relacao
+
+def near_cluster(ponto,clusters):
+    near=0
+    d_near=dist_sqd(ponto,clusters[0])
+    for i in range(1,len(clusters)):
+        d_atual=dist_sqd(ponto,clusters[i])
+        if d_atual<d_near:
+            near, d_near = i, d_atual
+    return near
+
+def dist_sqd(A,B):
+    S=0
+    for i in range(len(A)):
+        p=A[i]-B[i]
+        S+=p*p
+    return S   
+    
+def atualiza_cluster(pontos,cluster_index,relacao):
+    generico=[0]*len(pontos[0])
+    cont=0
+    for i in range(len(pontos)):
+        if relacao[i]==cluster_index:
+            cont+=1
+            for j in range(len(generico)):
+                generico[j]+=pontos[i][j]
+    if cont!=0:
+        for j in range(len(generico)):
+            generico[j]=generico[j]/cont
+    return generico
+
+def get_clusters(k, pontos):
+    clusters=list(np.random.choice(np.arange(len(pontos)),k,False))
+    for i in range(k):
+        clusters[i]=pontos[i]
+    return clusters
+    
+def total_var(pontos,clusters,relacao):
+    S=0
+    for i in range(len(pontos)):
+        j=relacao[i]
+        S+=dist_sqd(pontos[i],clusters[j])
+    return S
+
+def silhueta_media(pontos,clusters,relacao):
+    s=0
+    for i in range(len(pontos)):
+        s+=silhueta_pt(i,pontos,clusters,relacao)
+    return s/len(pontos)
+        
+
+def silhueta_pt(ind_pt,pontos,clusters,relacao):
+    pt=pontos[ind_pt]
+    clus_certo=relacao[ind_pt]
+    parciais=[[0,0]]*len(clusters)
+    for i in range(len(pontos)):
+        t=relacao[i]
+        parciais[t][0]+=dist_sqd(pt,pontos[i])
+        parciais[t][1]+=1
+    if parciais[clus_certo][1]==1:
+        return 0
+    a=parciais[clus_certo][0]/(parciais[clus_certo][1]-1)
+    if clus_certo==0 and len(clusters)>1:
+        b=parciais[1][0]/(parciais[1][1])
+    else:
+        b=parciais[0][0]/(parciais[0][1])
+    for j in range(1,len(clusters)):
+        if j!=clus_certo and len(clusters)>1:
+            c=parciais[j][0]/(parciais[j][1])
+            if c<b:
+                b=c
+    s=(b-a)/max(a,b)
+    return s
+    
+if __name__ == "__main__":
+    main()
