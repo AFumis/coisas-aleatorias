@@ -1,3 +1,1 @@
-# hello-world
-Oi :)   
-O github mandou eu escrever aqui
+Projetos pessoais que coloquei aqui apenas para compartilhar com alguém.
